@@ -598,6 +598,8 @@ class TreeinsFusedDataset(BaseDataset):
                 pre_collate_transform=self.pre_collate_transform,
                 transform=self.train_transform,
                 keep_instance=True,
+                target_classes=dataset_opt.get('target_classes', None),
+                train_val_separate=dataset_opt.get('train_val_separate', False)
             )
 
             self.val_dataset = dataset_cls(
@@ -611,6 +613,8 @@ class TreeinsFusedDataset(BaseDataset):
                 pre_collate_transform=self.pre_collate_transform,
                 transform=self.val_transform,
                 keep_instance=True,
+                target_classes=dataset_opt.get('target_classes', None),
+                train_val_separate=dataset_opt.get('train_val_separate', False)
             )
             self.test_dataset = dataset_cls(
                 self._data_path,
@@ -623,6 +627,8 @@ class TreeinsFusedDataset(BaseDataset):
                 pre_collate_transform=self.pre_collate_transform,
                 transform=self.test_transform,
                 keep_instance=True,
+                target_classes=dataset_opt.get('target_classes', None),
+                train_val_separate=dataset_opt.get('train_val_separate', False)
             )
         # @Treeins: case for evaluation/when running eval.py
         else:

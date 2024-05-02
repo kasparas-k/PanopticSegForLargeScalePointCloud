@@ -1,11 +1,10 @@
 import os
 import os.path as osp
-from itertools import repeat, product
 import numpy as np
-import h5py
 import torch
 import random
 import glob
+from pathlib import Path
 from plyfile import PlyData, PlyElement
 from torch_geometric.data import InMemoryDataset, Data, extract_zip, Dataset
 from torch_geometric.data.dataset import files_exist
@@ -14,13 +13,10 @@ import torch_geometric.transforms as T
 import logging
 from sklearn.neighbors import NearestNeighbors, KDTree
 from tqdm.auto import tqdm as tq
-import csv
-import pandas as pd
-import pickle
-import gdown
-import shutil
+
 # PLY reader
 from torch_points3d.modules.KPConv.plyutils import read_ply
+import laspy
 from torch_points3d.datasets.samplers import BalancedRandomSampler
 import torch_points3d.core.data_transform as cT
 from torch_points3d.datasets.base_dataset import BaseDataset
@@ -56,10 +52,25 @@ def object_name_to_label(object_class):
     object_label = OBJECT_LABEL.get(object_class, OBJECT_LABEL["unclassified"])
     return object_label
 
-def read_treeins_format(train_file, label_out=True, verbose=False, debug=False):
+def read_treeins_format(train_file, label_out=True, verbose=False, debug=False, target_classes=None):
     """extract data from a treeins file"""
-    raw_path = train_file
-    data = read_ply(raw_path)
+    raw_path: str = train_file
+    if raw_path.endswith('.ply'):
+        data = read_ply(raw_path)
+    elif raw_path.endswith('.las') or raw_path.endswith('.laz'):
+        _las = laspy.read(raw_path)
+        data = dict(
+            x=_las.x.scaled_array(),
+            y=_las.y.scaled_array(),
+            z=_las.z.scaled_array(),
+            # semantic labels won't be used in the current implementation, so it's fine to let the mappings be anything
+            semantic_seg=np.array(_las.classification),
+            treeID=np.array(_las.treeID),
+        )
+
+    if target_classes is not None:
+        target_idx = np.isin(data['semantic_seg'], target_classes)
+
     xyz = np.vstack((data['x'], data['y'], data['z'])).astype(np.float32).T
     if not label_out:
         return xyz
@@ -68,7 +79,12 @@ def read_treeins_format(train_file, label_out=True, verbose=False, debug=False):
     semantic_labels = data['semantic_seg'].astype(np.int64)-1
     # @Treeins: The attribute treeID tells us to which tree a point belongs, hence we use it as instance labels
     instance_labels = data['treeID'].astype(np.int64)+1
-    #print(np.unique(instance_labels))
+
+    if target_classes is not None:
+        xyz = xyz[target_idx]
+        semantic_labels = semantic_labels[target_idx]
+        instance_labels = instance_labels[target_idx]
+
     return (
         torch.from_numpy(xyz),
         torch.from_numpy(semantic_labels),
@@ -173,6 +189,8 @@ class TreeinsOriginalFused(InMemoryDataset):
         keep_instance=False,
         verbose=False,
         debug=False,
+        target_classes=None,
+        train_val_separate=False,
     ):
         self.transform = transform
         self.pre_collate_transform = pre_collate_transform
@@ -181,7 +199,9 @@ class TreeinsOriginalFused(InMemoryDataset):
         self.keep_instance = keep_instance
         self.verbose = verbose
         self.debug = debug
+        self.target_classes = target_classes
         self._split = split
+        self._train_val_separate = train_val_separate
         self.grid_size = grid_size
      
         super(TreeinsOriginalFused, self).__init__(root, transform, pre_transform, pre_filter)
@@ -223,13 +243,19 @@ class TreeinsOriginalFused(InMemoryDataset):
 
     @property
     def raw_file_names(self):
-        """returns list of paths to the .ply raw data files we use"""
+        """returns list of paths to the .ply and .las/.laz raw data files we use"""
         if self.forest_regions == []:  # @Treeins: get all data file names in folder self.raw_dir
-            return glob.glob(self.raw_dir + '/**/*.ply', recursive=True)
+            return (
+                glob.glob(self.raw_dir + '/**/*.ply', recursive=True)
+                + glob.glob(self.raw_dir + '/**/*.las', recursive=True)
+                + glob.glob(self.raw_dir + '/**/*.laz', recursive=True)
+            )
         else: #@Treeins: get data file names coming from the forest region(s) in self.forest_regions within the folder self.raw_dir
             raw_files_list = []
             for region in self.forest_regions:
                 raw_files_list += glob.glob(self.raw_dir + "/" + region + "/*.ply", recursive=False)
+                raw_files_list += glob.glob(self.raw_dir + "/" + region + "/*.las", recursive=False)
+                raw_files_list += glob.glob(self.raw_dir + "/" + region + "/*.laz", recursive=False)
             return raw_files_list
 
     @property
@@ -264,7 +290,6 @@ class TreeinsOriginalFused(InMemoryDataset):
         else:
             return [os.path.join(self.processed_dir, 'raw_area_'+os.path.split(f)[-1].split('.')[0]+'.pt') for f in self.test_area]
 
-
     @property
     def processed_file_names(self):
         """return list of paths to all kinds of files in the processed directory"""
@@ -293,7 +318,8 @@ class TreeinsOriginalFused(InMemoryDataset):
         if feats is not None:
             return feats.shape[-1]
         return 0
-    #def download(self):
+    
+    # def download(self):
     #    super().download()
 
     def process(self):
@@ -308,19 +334,27 @@ class TreeinsOriginalFused(InMemoryDataset):
             for area_num, file_path in enumerate(input_ply_files):
                 area_name = os.path.split(file_path)[-1]
                 xyz, semantic_labels, instance_labels = read_treeins_format(
-                    file_path, label_out=True, verbose=self.verbose, debug=self.debug
+                    file_path, label_out=True, verbose=self.verbose, debug=self.debug, target_classes=self.target_classes
                 )
 
                 data = Data(pos=xyz, y=semantic_labels)
                 data.validation_set = False
                 data.test_set = False
-                #@Treeins: list of lists which each contains one .ply data file
-                if area_name[-7:-4]=="val":
-                    data.validation_set = True
-                #@Treeins:  if "test" at end of area_name, i.e. at end of .ply file name, we put data file into test set
-                elif area_name[-8:-4]=="test":
-                    data.test_set = True
-                    self.test_area.append(area_num)
+                if not self._train_val_separate:
+                    #@Treeins: list of lists which each contains one .ply data file
+                    if area_name[-7:-4]=="val":
+                        data.validation_set = True
+                    #@Treeins:  if "test" at end of area_name, i.e. at end of .ply file name, we put data file into test set
+                    elif area_name[-8:-4]=="test":
+                        data.test_set = True
+                        self.test_area.append(area_num)
+                else:
+                    split = Path(file_path).resolve().relative_to(Path(self.raw_dir).resolve()).parts[0]
+                    if split == 'val':
+                        data.validation_set = True
+                    elif split == 'test':
+                        data.test_set = True
+                        self.test_area.append(area_num)
 
                 if self.keep_instance:
                     data.instance_labels = instance_labels
@@ -645,6 +679,8 @@ class TreeinsFusedDataset(BaseDataset):
             split="train",
             pre_collate_transform=self.pre_collate_transform,
             transform=self.train_transform,
+            target_classes=dataset_opt.get('target_classes', None),
+            train_val_separate=dataset_opt.get('train_val_separate', False)
         )
 
         self.val_dataset = dataset_cls(
@@ -654,6 +690,8 @@ class TreeinsFusedDataset(BaseDataset):
             split="val",
             pre_collate_transform=self.pre_collate_transform,
             transform=self.val_transform,
+            target_classes=dataset_opt.get('target_classes', None),
+            train_val_separate=dataset_opt.get('train_val_separate', False)
         )
         self.test_dataset = dataset_cls(
             self._data_path,
@@ -662,6 +700,8 @@ class TreeinsFusedDataset(BaseDataset):
             split="test",
             pre_collate_transform=self.pre_collate_transform,
             transform=self.test_transform,
+            target_classes=dataset_opt.get('target_classes', None),
+            train_val_separate=dataset_opt.get('train_val_separate', False)
         )
 
         if dataset_opt.class_weight_method:
