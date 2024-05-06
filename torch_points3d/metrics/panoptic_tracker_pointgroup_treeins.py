@@ -174,7 +174,8 @@ class PanopticTracker(SegmentationTracker):
         labels: PanopticLabels = model.get_labels()
 
         # Track semantic
-        super()._compute_metrics(outputs.semantic_logits, labels.y)
+        if outputs.semantic_logits is not None:
+            super()._compute_metrics(outputs.semantic_logits, labels.y)
 
         if not data:
             return
@@ -184,7 +185,10 @@ class PanopticTracker(SegmentationTracker):
         clusters, valid_c_idx = PanopticTracker._extract_clusters(outputs, min_cluster_points)
         # if not clusters:
         #    return
-        predicted_labels = outputs.semantic_logits.max(1)[1]
+        if outputs.semantic_logits is not None:
+            predicted_labels = outputs.semantic_logits.max(1)[1]
+        else:
+            predicted_labels = labels.y
 
         if clusters:
             if torch.max(labels.instance_labels) > 0:
@@ -220,6 +224,7 @@ class PanopticTracker(SegmentationTracker):
         if self._stage == "train" or not full_res:
             return
 
+        # TODO: adapt to no semantic logits
         # Test mode, compute votes in order to get full res predictions
         if self._test_area is None:
             self._test_area = self._dataset.test_data  # @Treeins
