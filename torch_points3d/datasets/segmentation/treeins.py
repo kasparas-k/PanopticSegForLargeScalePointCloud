@@ -52,19 +52,22 @@ def object_name_to_label(object_class):
     object_label = OBJECT_LABEL.get(object_class, OBJECT_LABEL["unclassified"])
     return object_label
 
-def read_treeins_format(train_file, label_out=True, verbose=False, debug=False, target_classes=None):
+def read_treeins_format(train_file, label_out=True, verbose=False, debug=False, target_classes=None, target_classes_remap=1):
     """extract data from a treeins file"""
     raw_path: str = train_file
     if raw_path.endswith('.ply'):
         data = read_ply(raw_path)
     elif raw_path.endswith('.las') or raw_path.endswith('.laz'):
         _las = laspy.read(raw_path)
+        x = _las.x.scaled_array()
+        y = _las.y.scaled_array()
+        z = _las.z.scaled_array()
+        # all coordinates shifted to have minimum at 0
         data = dict(
-            x=_las.x.scaled_array(),
-            y=_las.y.scaled_array(),
-            z=_las.z.scaled_array(),
-            # semantic labels won't be used in the current implementation, so it's fine to let the mappings be anything
-            semantic_seg=np.array(_las.classification),
+            x=x - np.min(x),
+            y=y - np.min(y),
+            z=z - np.min(z),
+            semantic_seg=np.array(_las.classification), # 2 should be the tree class at load time
             treeID=np.array(_las.treeID),
         )
 
@@ -82,7 +85,7 @@ def read_treeins_format(train_file, label_out=True, verbose=False, debug=False, 
 
     if target_classes is not None:
         xyz = xyz[target_idx]
-        semantic_labels = semantic_labels[target_idx]
+        semantic_labels = np.zeros_like(semantic_labels[target_idx]) + target_classes_remap
         instance_labels = instance_labels[target_idx]
 
     return (
