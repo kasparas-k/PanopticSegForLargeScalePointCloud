@@ -153,20 +153,12 @@ class PointGroup2headsInsSegOnly(BaseModel):
         #remove stuff points
         N = embed_logits.shape[0]  #.cpu().detach().numpy().shape[0]
         ind = torch.arange(0, N)
-        unique_predicted_labels = torch.unique(predicted_labels) #np.unique(predicted_labels)
-        ignore_labels=self._stuff_classes.to(self.device)  #.cpu().detach().numpy()
-        label_mask = torch.ones(predicted_labels.shape[0], dtype=torch.bool) #.cpu().detach().numpy()
-        for l in unique_predicted_labels:
-            if l in ignore_labels:
-                # Build clusters for a given label (ignore other points)
-                label_mask_l = predicted_labels == l
-                label_mask[label_mask_l] = False
-        local_ind = ind[label_mask]
-        label_batch = self.input.batch[label_mask]  #.cpu().detach().numpy()
+        local_ind = ind
+        label_batch = self.input.batch
         unique_in_batch = torch.unique(label_batch)
         
         #Clustering based on embeddings
-        embeds_u = embed_logits[label_mask]  #.cpu().detach().numpy()
+        embeds_u = embed_logits
         clusters_embed, cluster_type_embeds = meanshift_cluster.cluster_single(embeds_u, unique_in_batch, label_batch, local_ind, 1, self.opt.bandwidth)
 
 
