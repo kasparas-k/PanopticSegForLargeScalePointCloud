@@ -192,6 +192,7 @@ class Trainer:
                     with torch.no_grad():
                         self._tracker.track(self._model, data=data, **self.tracker_options)
 
+                tracked_metrics = self._tracker.get_metrics()
                 tq_train_loader.set_postfix(
                     **tracked_metrics,
                     data_loading=float(t_data),
