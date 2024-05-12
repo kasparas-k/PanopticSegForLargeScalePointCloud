@@ -37,9 +37,7 @@ class PanopticResults(NamedTuple):
         if self.mask_scores!=None:
             _mask = self.mask_scores.squeeze(1) > -0.5  #??
         n_prop = len(self.clusters)
-        proposal_masks = torch.zeros(n_prop, self.semantic_logits.shape[0])
-        # for i, cluster in enumerate(self.clusters):
-        #     proposal_masks[i, cluster] = 1
+        proposal_masks = torch.zeros(n_prop, self.offset_logits.shape[0])
         
         proposals_idx = []
         for i, cluster in enumerate(self.clusters):
