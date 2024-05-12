@@ -98,12 +98,6 @@ class Trainer:
             self._model: BaseModel = instantiate_model(copy.deepcopy(self._cfg), self._dataset)
             self._model.instantiate_optimizers(self._cfg, "cuda" in device)
             self._model.set_pretrained_weights()
-            #if not self._checkpoint.validate(self._dataset.used_properties):
-            #    log.warning(
-            #        "The model will not be able to be used from pretrained weights without the corresponding dataset. Current properties are {}".format(
-            #            self._dataset.used_properties
-            #        )
-            #    )
         self._checkpoint.dataset_properties = self._dataset.used_properties
 
         log.info(self._model)
@@ -158,15 +152,8 @@ class Trainer:
                 continue
 
             if self._dataset.has_val_loader:
-                self._test_epoch(epoch, "val")
+                self._val_epoch(epoch, "val")
 
-            if self._dataset.has_test_loaders:
-                self._test_epoch(epoch, "test")
-
-        # Single test evaluation in resume case
-        if self._checkpoint.start_epoch > self._cfg.training.epochs:
-            if self._dataset.has_test_loaders:
-                self._test_epoch(epoch, "test")
 
     def eval(self, stage_name=""):
         self._is_training = False
@@ -174,11 +161,7 @@ class Trainer:
         epoch = self._checkpoint.start_epoch
         if self._dataset.has_val_loader:
             if not stage_name or stage_name == "val":
-                self._test_epoch(epoch, "val")
-
-        if self._dataset.has_test_loaders:
-            if not stage_name or stage_name == "test":
-                self._test_epoch(epoch, "test")
+                self._val_epoch(epoch, "val")
 
     def _finalize_epoch(self, epoch):
         self._tracker.finalise(**self.tracker_options)
@@ -210,7 +193,7 @@ class Trainer:
                         self._tracker.track(self._model, data=data, **self.tracker_options)
 
                 tq_train_loader.set_postfix(
-                    **self._tracker.get_metrics(),
+                    **tracked_metrics,
                     data_loading=float(t_data),
                     iteration=float(time.time() - iter_start_time),
                     color=COLORS.TRAIN_COLOR
@@ -230,12 +213,9 @@ class Trainer:
 
         self._finalize_epoch(epoch)
 
-    def _test_epoch(self, epoch, stage_name: str):
+    def _val_epoch(self, epoch, stage_name: str):
         voting_runs = self._cfg.get("voting_runs", 1)
-        if stage_name == "test":
-            loaders = self._dataset.test_dataloaders
-        else:
-            loaders = [self._dataset.val_dataloader]
+        loaders = [self._dataset.val_dataloader]
 
         self._model.eval()
         if self.enable_dropout:
