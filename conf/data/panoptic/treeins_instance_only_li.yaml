@@ -4,11 +4,13 @@ defaults:
 
 task: panoptic
 class: treeins.TreeinsFusedDataset
-dataroot: /data/home/kaka9913/data/FORinstance_dataset/
-dataset_name: paper
+dataroot: /data/home/kaka9913/data/seg_FORinstance
+train_val_separate: True # train val and test directories expected in the dataset's raw root
+dataset_name: dev_li
 forest_regions: []
 fold: []
-first_subsampling: 0.3
+target_classes: [4, 5, 6]
+first_subsampling: 0.2
 radius: 8
 grid_size: ${data.first_subsampling}
 keep_instance: True

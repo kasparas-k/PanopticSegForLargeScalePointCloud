@@ -181,37 +181,29 @@ class Trainer:
         train_loader = self._dataset.train_dataloader
 
         iter_data_time = time.time()
-        with Ctq(train_loader) as tq_train_loader:
-            for i, data in enumerate(tq_train_loader):
-                t_data = time.time() - iter_data_time
-                iter_start_time = time.time()
-                self._model.set_input(data, self._device)
-                #self._model.optimize_parameters(epoch, self._dataset.batch_size)
-                self._model.optimize_parameters2(epoch, i, self._dataset.batch_size)
-                if i % 50 == 0:
-                    with torch.no_grad():
-                        self._tracker.track(self._model, data=data, **self.tracker_options)
+        for i, data in enumerate(train_loader):
+            t_data = time.time() - iter_data_time
+            iter_start_time = time.time()
+            self._model.set_input(data, self._device)
+            #self._model.optimize_parameters(epoch, self._dataset.batch_size)
+            self._model.optimize_parameters2(epoch, i, self._dataset.batch_size)
+            if i % 50 == 0:
+                with torch.no_grad():
+                    self._tracker.track(self._model, data=data, **self.tracker_options)
 
-                tracked_metrics = self._tracker.get_metrics()
-                tq_train_loader.set_postfix(
-                    **tracked_metrics,
-                    data_loading=float(t_data),
-                    iteration=float(time.time() - iter_start_time),
-                    color=COLORS.TRAIN_COLOR
-                )
+            if self._visualizer.is_active:
+                self._visualizer.save_visuals(self._model.get_current_visuals())
 
-                if self._visualizer.is_active:
-                    self._visualizer.save_visuals(self._model.get_current_visuals())
+            iter_data_time = time.time()
 
-                iter_data_time = time.time()
+            if self.early_break:
+                break
 
-                if self.early_break:
-                    break
+            if self.profiling:
+                if i > self.num_batches:
+                    return 0
 
-                if self.profiling:
-                    if i > self.num_batches:
-                        return 0
-
+        print(self._tracker.get_metrics())
         self._finalize_epoch(epoch)
 
     def _val_epoch(self, epoch, stage_name: str):
@@ -234,25 +226,23 @@ class Trainer:
                 continue
 
             for i in range(voting_runs):
-                with Ctq(loader) as tq_loader:
-                    for data in tq_loader:
-                        with torch.no_grad():
-                            self._model.set_input(data, self._device)
-                            with torch.cuda.amp.autocast(enabled=self._model.is_mixed_precision()):
-                                self._model.forward(epoch=epoch, is_training = self._is_training)
-                            self._tracker.track(self._model, data=data, **self.tracker_options)
-                        tq_loader.set_postfix(**self._tracker.get_metrics(), color=COLORS.TEST_COLOR)
+                for val_epoch_num, data in enumerate(loader):
+                    with torch.no_grad():
+                        self._model.set_input(data, self._device)
+                        with torch.cuda.amp.autocast(enabled=self._model.is_mixed_precision()):
+                            self._model.forward(epoch=epoch, is_training = self._is_training)
+                        self._tracker.track(self._model, data=data, **self.tracker_options)
+                    if self.has_visualization and self._visualizer.is_active:
+                        self._visualizer.save_visuals(self._model.get_current_visuals())
 
-                        if self.has_visualization and self._visualizer.is_active:
-                            self._visualizer.save_visuals(self._model.get_current_visuals())
+                    if self.early_break:
+                        break
 
-                        if self.early_break:
-                            break
+                    if self.profiling:
+                        if i > self.num_batches:
+                            return 0
 
-                        if self.profiling:
-                            if i > self.num_batches:
-                                return 0
-
+            print(self._tracker.get_metrics())
             self._finalize_epoch(epoch)
             self._tracker.print_summary()
 
