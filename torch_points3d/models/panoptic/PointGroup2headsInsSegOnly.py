@@ -196,7 +196,6 @@ class PointGroup2headsInsSegOnly(BaseModel):
                 batch_cluster = self._voxelizer(batch_cluster)
 
             # Score
-            batch_cluster = batch_cluster.to("cpu")
             if self._scorer_type == "MLP":
                 score_backbone_out = self.ScorerMLP(batch_cluster.x.to(self.device))
                 cluster_feats = scatter(

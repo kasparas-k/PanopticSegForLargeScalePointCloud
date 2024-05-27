@@ -4,7 +4,7 @@ defaults:
 
 task: panoptic
 class: treeins.TreeinsFusedDataset
-dataroot: /data/home/kaka9913/data/seg_FORinstance
+dataroot: /workspace/data/FORinstance_dataset/gt
 train_val_separate: True # train val and test directories expected in the dataset's raw root
 dataset_name: dev
 forest_regions: []

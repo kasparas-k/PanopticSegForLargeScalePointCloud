@@ -9,7 +9,10 @@ from multiprocessing import Process
 from functools import partial
 def meanshift_cluster(prediction, bandwidth):
     bandwidth = bandwidth #0.6
+<<<<<<< Updated upstream
     #ms = MeanShift(bandwidth=bandwidth,bin_seeding=True, n_jobs=-1)
+=======
+>>>>>>> Stashed changes
     ms = MeanShiftEuc(bandwidth=bandwidth) #, n_jobs=-1)
     #print ('Mean shift clustering, might take some time ...')
     ms.fit(prediction)
@@ -50,6 +53,7 @@ def cluster_loop(embed_logits_logits_u, unique_in_batch, label_batch, local_ind,
                 all_clusters.append(sample_embed_logits.detach())
                 cluster_type_loop.append(loop_i)
     
+<<<<<<< Updated upstream
     results = []
     for i, cl in enumerate(all_clusters):
         start = time.process_time()
@@ -65,6 +69,26 @@ def cluster_loop(embed_logits_logits_u, unique_in_batch, label_batch, local_ind,
             label_mask_l = pre_ins_labels_embed == l
             final_result.append(sampleInBatch_local_ind[label_mask_l])
             cluster_type.append(loop_i_)
+=======
+    # if unique_in_batch.shape[0]>0:
+    #     processes=unique_in_batch.shape[0]
+    # else:
+    #     processes=1
+    processes = 1
+    with multiprocessing.Pool(processes=processes) as pool:
+        results = pool.map(meanshift_cluster, all_clusters)
+        for i in range(len(results)):
+            pre_ins_labels_embed = results[i]
+            sampleInBatch_local_ind = local_logits[i]
+            loop_i_ = cluster_type_loop[i]
+            unique_preInslabels = torch.unique(pre_ins_labels_embed)
+            for l in unique_preInslabels:
+                if l == -1:
+                    continue
+                label_mask_l = pre_ins_labels_embed == l
+                final_result.append(sampleInBatch_local_ind[label_mask_l])
+                cluster_type.append(loop_i_)
+>>>>>>> Stashed changes
     
     #print("total time",time.time()-t)
     return final_result, cluster_type

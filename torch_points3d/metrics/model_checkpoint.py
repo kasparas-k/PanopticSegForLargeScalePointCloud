@@ -171,7 +171,7 @@ class ModelCheckpoint(object):
         # Conversion of run_config to save a dictionary and not a pickle of omegaconf
         rc = OmegaConf.to_container(copy.deepcopy(run_config))
         self._checkpoint = Checkpoint.load(load_dir, check_name, run_config=rc, strict=strict, resume=resume)
-        self._checkpoint.run_config['data']['fold'] = run_config.data.fold
+        self._checkpoint.run_config['data'] = run_config.data
         self._resume = resume
         self._selection_stage = selection_stage
 

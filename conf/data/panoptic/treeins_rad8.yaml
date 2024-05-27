@@ -4,7 +4,7 @@ defaults:
 
 task: panoptic
 class: treeins.TreeinsFusedDataset
-dataroot: /data/home/kaka9913/data/FORinstance_dataset/
+dataroot: /workspace/data/FORinstance_dataset/
 dataset_name: paper
 forest_regions: []
 fold: []

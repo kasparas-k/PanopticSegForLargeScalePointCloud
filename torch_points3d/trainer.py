@@ -42,10 +42,11 @@ class Trainer:
     It supports MC dropout - multiple voting_runs for val / test datasets
     """
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, test_run=False):
         self.set_seed(2022)
         self._cfg = cfg
         self._initialize_trainer()
+        self._test_run = test_run
 
     def _initialize_trainer(self):
         # Enable CUDNN BACKEND
@@ -163,6 +164,10 @@ class Trainer:
             if not stage_name or stage_name == "val":
                 self._val_epoch(epoch, "val")
 
+        if self._dataset.has_test_loaders and self._test_run:
+            if not stage_name or stage_name == "test":
+                self._test_epoch(epoch, "test")
+
     def _finalize_epoch(self, epoch):
         self._tracker.finalise(**self.tracker_options)
         if self._is_training:
@@ -174,7 +179,6 @@ class Trainer:
                 log.info("Learning rate = %f" % self._model.learning_rate)
 
     def _train_epoch(self, epoch: int):
-
         self._model.train()
         self._tracker.reset("train")
         self._visualizer.reset(epoch, "train")
@@ -243,6 +247,51 @@ class Trainer:
                             return 0
 
             print(self._tracker.get_metrics())
+            self._finalize_epoch(epoch)
+            self._tracker.print_summary()
+    
+    def _test_epoch(self, epoch, stage_name: str):
+        voting_runs = self._cfg.get("voting_runs", 1)
+        if stage_name == "test":
+            loaders = self._dataset.test_dataloaders
+        else:
+            loaders = [self._dataset.val_dataloader]
+
+        self._model.eval()
+        if self.enable_dropout:
+            self._model.enable_dropout_in_eval()
+
+        for loader in loaders:
+            stage_name = loader.dataset.name
+            self._tracker.reset(stage_name)
+            if self.has_visualization:
+                self._visualizer.reset(epoch, stage_name)
+            if not self._dataset.has_labels(stage_name) and not self.tracker_options.get(
+                "make_submission", False
+            ):  # No label, no submission -> do nothing
+                log.warning("No forward will be run on dataset %s." % stage_name)
+                continue
+
+            for i in range(voting_runs):
+                with Ctq(loader) as tq_loader:
+                    for data in tq_loader:
+                        with torch.no_grad():
+                            self._model.set_input(data, self._device)
+                            with torch.cuda.amp.autocast(enabled=self._model.is_mixed_precision()):
+                                self._model.forward(epoch=epoch, is_training = self._is_training)
+                            self._tracker.track(self._model, data=data, **self.tracker_options)
+                        tq_loader.set_postfix(**self._tracker.get_metrics(), color=COLORS.TEST_COLOR)
+
+                        if self.has_visualization and self._visualizer.is_active:
+                            self._visualizer.save_visuals(self._model.get_current_visuals())
+
+                        if self.early_break:
+                            break
+
+                        if self.profiling:
+                            if i > self.num_batches:
+                                return 0
+
             self._finalize_epoch(epoch)
             self._tracker.print_summary()
 

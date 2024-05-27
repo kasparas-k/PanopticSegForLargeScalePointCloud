@@ -10,7 +10,7 @@ def main(cfg):
     if cfg.pretty_print:
         print(OmegaConf.to_yaml(cfg))
     
-    trainer = Trainer(cfg)
+    trainer = Trainer(cfg, True)
     trainer.eval(stage_name = "test")
     #
     # # https://github.com/facebookresearch/hydra/issues/440
