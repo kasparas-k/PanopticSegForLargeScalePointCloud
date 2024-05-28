@@ -121,8 +121,11 @@ class PointGroup2headsInsSegOnly(BaseModel):
                     else:
                         raise NotImplementedError
                 
+        dummy_semantic_logits = torch.zeros(offset_logits.shape[0], 2, dtype=offset_logits.dtype, device=offset_logits.device)
+        dummy_semantic_logits += torch.tensor([[0, 1]], dtype=offset_logits.dtype, device=offset_logits.device)
+
         self.output = PanopticResults(
-            semantic_logits=None,
+            semantic_logits=dummy_semantic_logits,
             offset_logits=offset_logits,
             embed_logits=embed_logits,
             clusters=all_clusters,

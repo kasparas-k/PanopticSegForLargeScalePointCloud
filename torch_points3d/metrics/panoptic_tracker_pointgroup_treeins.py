@@ -366,7 +366,7 @@ class PanopticTracker(SegmentationTracker):
                       predicted_sem_labels):
 
         # output interme results
-        has_prediction = pre_sub_ins != -1
+        has_prediction = pre_sub_ins != -2
         # print(np.any(has_prediction))
         if np.any(has_prediction):
             if not os.path.exists("viz"):
@@ -667,7 +667,7 @@ class PanopticTracker(SegmentationTracker):
                         if size_l < 10:
                             full_ins_pred[label_mask_l] = -1
                             
-                    self.dataset.to_eval_ply(
+                    self._dataset.to_eval_ply(
                         test_area_i.pos,
                         full_ins_pred.numpy(), #[-1, ...]
                         test_area_i.instance_labels, #[0, ..]

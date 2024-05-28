@@ -54,7 +54,6 @@ def to_ply(pos, label, file):
     ply_array["blue"] = colors[:, 2]
     el = PlyElement.describe(ply_array, 'vertex')
     PlyData([el], text=True).write(file)
-    print('out')
 
 
 def to_eval_ply(pos, pre_label, gt, file):
@@ -643,6 +642,8 @@ class TreeinsFusedDataset(BaseDataset):
                 pre_collate_transform=self.pre_collate_transform,
                 transform=self.test_transform,
                 keep_instance=True,
+                target_classes=dataset_opt.get('target_classes', None),
+                train_val_separate=dataset_opt.get('train_val_separate', False),
             )
 
         # if dataset_opt.class_weight_method:

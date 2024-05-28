@@ -78,7 +78,7 @@ def read_treeins_format(train_file, label_out=True, verbose=False, debug=False, 
     if not label_out:
         return xyz
     # @Treeins: read in semantic segmentation labels (0: unclassified, 1: non-tree, 2: tree) and change them to
-    # (-1: unclassified, 0, non-tree, 1: tree) because unclassified must have label -1
+    # (-1: unclassified, 0: non-tree, 1: tree) because unclassified must have label -1
     semantic_labels = data['semantic_seg'].astype(np.int64)-1
     # @Treeins: The attribute treeID tells us to which tree a point belongs, hence we use it as instance labels
     instance_labels = data['treeID'].astype(np.int64)+1
@@ -444,7 +444,7 @@ class TreeinsOriginalFused(InMemoryDataset):
             processed_area_path = osp.join(self.processed_dir, self.processed_file_names[i])
             if not os.path.exists(processed_area_path): #if .pt file corresponding to .ply test file at file_path hasn't been created and saved in self.processed_dir yet
                 xyz, semantic_labels, instance_labels = read_treeins_format(
-                    file_path, label_out=True, verbose=self.verbose, debug=self.debug
+                    file_path, label_out=True, verbose=self.verbose, debug=self.debug,  target_classes=self.target_classes
                 )
                 data = Data(pos=xyz, y=semantic_labels)
                 if self.keep_instance:
