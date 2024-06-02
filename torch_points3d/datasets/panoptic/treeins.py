@@ -584,6 +584,9 @@ class TreeinsFusedDataset(BaseDataset):
         sampling_format = dataset_opt.get("sampling_format", "sphere")
         dataset_cls = PanopticTreeinsCylinder if sampling_format == "cylinder" else PanopticTreeinsSphere
 
+        run_name = dataset_opt.get('run_name', 'run')
+        on_disk = dataset_opt.get('on_disk', False)
+
         # @Treeins: case for training/when running train.py
         if len(self.dataset_opt.fold) == 0 or isinstance(self.dataset_opt.fold[0], int):
             self.train_dataset = dataset_cls(
@@ -615,6 +618,7 @@ class TreeinsFusedDataset(BaseDataset):
                 target_classes=dataset_opt.get('target_classes', None),
                 train_val_separate=dataset_opt.get('train_val_separate', False)
             )
+
             self.test_dataset = dataset_cls(
                 self._data_path,
                 sample_per_epoch=-1,
@@ -629,6 +633,12 @@ class TreeinsFusedDataset(BaseDataset):
                 target_classes=dataset_opt.get('target_classes', None),
                 train_val_separate=dataset_opt.get('train_val_separate', False)
             )
+
+            if on_disk:
+                self.train_dataset = self.train_dataset.to_on_disk_dataset(root=f'on_disk_dset/{run_name}/train')
+                self.val_dataset = self.val_dataset.to_on_disk_dataset(root=f'on_disk_dset/{run_name}/val')
+                self.test_dataset = self.test_dataset.to_on_disk_dataset(root=f'on_disk_dset/{run_name}/test')
+
         # @Treeins: case for evaluation/when running eval.py
         else:
             self.test_dataset = dataset_cls(
