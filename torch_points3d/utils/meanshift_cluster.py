@@ -9,8 +9,8 @@ from multiprocessing import Process
 from functools import partial
 def meanshift_cluster(prediction, bandwidth):
     bandwidth = bandwidth #0.6
-    #ms = MeanShift(bandwidth=bandwidth,bin_seeding=True, n_jobs=-1)
-    ms = MeanShiftEuc(bandwidth=bandwidth) #, n_jobs=-1)
+    ms = MeanShift(bandwidth=bandwidth,bin_seeding=True, n_jobs=-1)
+    # ms = MeanShiftEuc(bandwidth=bandwidth) #, n_jobs=-1)
     #print ('Mean shift clustering, might take some time ...')
     ms.fit(prediction)
     labels = ms.labels_

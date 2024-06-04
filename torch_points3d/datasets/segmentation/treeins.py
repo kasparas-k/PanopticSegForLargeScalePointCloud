@@ -6,7 +6,7 @@ import random
 import glob
 from pathlib import Path
 from plyfile import PlyData, PlyElement
-from torch_geometric.data import InMemoryDataset, Data, extract_zip, Dataset
+from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.data.dataset import files_exist
 from torch_geometric.data import DataLoader
 import torch_geometric.transforms as T
@@ -52,7 +52,7 @@ def object_name_to_label(object_class):
     object_label = OBJECT_LABEL.get(object_class, OBJECT_LABEL["unclassified"])
     return object_label
 
-def read_treeins_format(train_file, label_out=True, verbose=False, debug=False, target_classes=None, target_classes_remap=1):
+def read_treeins_format(train_file, label_out=True, verbose=False, debug=False, target_classes=None, target_classes_remap=1, scale_coords=None):
     """extract data from a treeins file"""
     raw_path: str = train_file
     if raw_path.endswith('.ply'):
@@ -87,6 +87,9 @@ def read_treeins_format(train_file, label_out=True, verbose=False, debug=False, 
         xyz = xyz[target_idx]
         semantic_labels = np.zeros_like(semantic_labels[target_idx]) + target_classes_remap
         instance_labels = instance_labels[target_idx]
+
+    if scale_coords is not None and scale_coords > 0:
+        xyz = scale_coords * xyz
 
     return (
         torch.from_numpy(xyz),
@@ -194,6 +197,7 @@ class TreeinsOriginalFused(InMemoryDataset):
         debug=False,
         target_classes=None,
         train_val_separate=False,
+        scale_coords=None,
     ):
         self.transform = transform
         self.pre_collate_transform = pre_collate_transform
@@ -206,6 +210,7 @@ class TreeinsOriginalFused(InMemoryDataset):
         self._split = split
         self._train_val_separate = train_val_separate
         self.grid_size = grid_size
+        self._scale_coords = scale_coords
      
         super(TreeinsOriginalFused, self).__init__(root, transform, pre_transform, pre_filter)
         # @Treeins: case for training/when running train.py
@@ -337,7 +342,8 @@ class TreeinsOriginalFused(InMemoryDataset):
             for area_num, file_path in enumerate(input_ply_files):
                 area_name = os.path.split(file_path)[-1]
                 xyz, semantic_labels, instance_labels = read_treeins_format(
-                    file_path, label_out=True, verbose=self.verbose, debug=self.debug, target_classes=self.target_classes
+                    file_path, label_out=True, verbose=self.verbose, debug=self.debug,
+                    target_classes=self.target_classes, scale_coords=self._scale_coords
                 )
 
                 data = Data(pos=xyz, y=semantic_labels)
@@ -444,7 +450,8 @@ class TreeinsOriginalFused(InMemoryDataset):
             processed_area_path = osp.join(self.processed_dir, self.processed_file_names[i])
             if not os.path.exists(processed_area_path): #if .pt file corresponding to .ply test file at file_path hasn't been created and saved in self.processed_dir yet
                 xyz, semantic_labels, instance_labels = read_treeins_format(
-                    file_path, label_out=True, verbose=self.verbose, debug=self.debug,  target_classes=self.target_classes
+                    file_path, label_out=True, verbose=self.verbose, debug=self.debug,
+                    target_classes=self.target_classes, scale_coords=self._scale_coords
                 )
                 data = Data(pos=xyz, y=semantic_labels)
                 if self.keep_instance:

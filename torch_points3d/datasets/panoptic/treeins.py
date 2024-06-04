@@ -584,9 +584,6 @@ class TreeinsFusedDataset(BaseDataset):
         sampling_format = dataset_opt.get("sampling_format", "sphere")
         dataset_cls = PanopticTreeinsCylinder if sampling_format == "cylinder" else PanopticTreeinsSphere
 
-        run_name = dataset_opt.get('run_name', 'run')
-        on_disk = dataset_opt.get('on_disk', False)
-
         # @Treeins: case for training/when running train.py
         if len(self.dataset_opt.fold) == 0 or isinstance(self.dataset_opt.fold[0], int):
             self.train_dataset = dataset_cls(
@@ -601,7 +598,8 @@ class TreeinsFusedDataset(BaseDataset):
                 transform=self.train_transform,
                 keep_instance=True,
                 target_classes=dataset_opt.get('target_classes', None),
-                train_val_separate=dataset_opt.get('train_val_separate', False)
+                train_val_separate=dataset_opt.get('train_val_separate', False),
+                scale_coords=dataset_opt.get('scale_coords', None),
             )
 
             self.val_dataset = dataset_cls(
@@ -616,31 +614,10 @@ class TreeinsFusedDataset(BaseDataset):
                 transform=self.val_transform,
                 keep_instance=True,
                 target_classes=dataset_opt.get('target_classes', None),
-                train_val_separate=dataset_opt.get('train_val_separate', False)
+                train_val_separate=dataset_opt.get('train_val_separate', False),
+                scale_coords=dataset_opt.get('scale_coords', None),
             )
 
-            self.test_dataset = dataset_cls(
-                self._data_path,
-                sample_per_epoch=-1,
-                radius=self.dataset_opt.radius,
-                grid_size=self.dataset_opt.grid_size,
-                forest_regions=self.dataset_opt.forest_regions,  # @Treeins
-                test_area=self.dataset_opt.fold,
-                split="test",
-                pre_collate_transform=self.pre_collate_transform,
-                transform=self.test_transform,
-                keep_instance=True,
-                target_classes=dataset_opt.get('target_classes', None),
-                train_val_separate=dataset_opt.get('train_val_separate', False)
-            )
-
-            if on_disk:
-                self.train_dataset = self.train_dataset.to_on_disk_dataset(root=f'on_disk_dset/{run_name}/train')
-                self.val_dataset = self.val_dataset.to_on_disk_dataset(root=f'on_disk_dset/{run_name}/val')
-                self.test_dataset = self.test_dataset.to_on_disk_dataset(root=f'on_disk_dset/{run_name}/test')
-
-        # @Treeins: case for evaluation/when running eval.py
-        else:
             self.test_dataset = dataset_cls(
                 self._data_path,
                 sample_per_epoch=-1,
@@ -654,10 +631,28 @@ class TreeinsFusedDataset(BaseDataset):
                 keep_instance=True,
                 target_classes=dataset_opt.get('target_classes', None),
                 train_val_separate=dataset_opt.get('train_val_separate', False),
+                scale_coords=dataset_opt.get('scale_coords', None),
             )
 
-        # if dataset_opt.class_weight_method:
-        #    self.add_weights(class_weight_method=dataset_opt.class_weight_method)
+
+        # @Treeins: case for evaluation/when running eval.py
+        else:
+            print('***********PROCESS TEST IN EVAL**********************')
+            self.test_dataset = dataset_cls(
+                self._data_path,
+                sample_per_epoch=-1,
+                radius=self.dataset_opt.radius,
+                grid_size=self.dataset_opt.grid_size,
+                forest_regions=self.dataset_opt.forest_regions,  # @Treeins
+                test_area=self.dataset_opt.fold,
+                split="test",
+                pre_collate_transform=self.pre_collate_transform,
+                transform=self.test_transform,
+                keep_instance=True,
+                target_classes=dataset_opt.get('target_classes', None),
+                train_val_separate=dataset_opt.get('train_val_separate', False),
+                scale_coords=dataset_opt.get('scale_coords', None),
+            )
 
     @property
     def test_data(self):
