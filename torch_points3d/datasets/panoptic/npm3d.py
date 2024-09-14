@@ -474,7 +474,7 @@ class NPM3DFusedDataset(BaseDataset):
         if isinstance(self.dataset_opt.fold, int):
             self.train_dataset = dataset_cls(
                 self._data_path,
-                sample_per_epoch=3000,
+                sample_per_epoch=self.dataset_opt.get('train_samples_per_epoch', 3000),
                 radius=self.dataset_opt.radius,
                 grid_size=self.dataset_opt.grid_size,
                 test_area=self.dataset_opt.fold,

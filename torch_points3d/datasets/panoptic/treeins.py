@@ -511,7 +511,7 @@ def final_eval(pre_sem, pre_ins_embed, pre_ins_offset, gt_sem, gt_ins, output_fi
 
 class PanopticTreeinsBase:
     INSTANCE_CLASSES = CLASSES_INV.keys()
-    NUM_MAX_OBJECTS = 80  # @Treeins: increased int because we had more number of instances in data files from the Treeins data set
+    NUM_MAX_OBJECTS = 5000  # @Treeins: increased int because we had more number of instances in data files from the Treeins data set
 
     STUFFCLASSES = torch.tensor([i for i in VALID_CLASS_IDS if i not in SemIDforInstance])
     ID2CLASS = {SemforInsid: i for i, SemforInsid in enumerate(list(SemIDforInstance))}
@@ -588,7 +588,7 @@ class TreeinsFusedDataset(BaseDataset):
         if len(self.dataset_opt.fold) == 0 or isinstance(self.dataset_opt.fold[0], int):
             self.train_dataset = dataset_cls(
                 self._data_path,
-                sample_per_epoch=3000,
+                sample_per_epoch=self.dataset_opt.get('train_samples_per_epoch', 3000),
                 radius=self.dataset_opt.radius,
                 grid_size=self.dataset_opt.grid_size,
                 forest_regions=self.dataset_opt.forest_regions,  # @Treeins
@@ -637,7 +637,6 @@ class TreeinsFusedDataset(BaseDataset):
 
         # @Treeins: case for evaluation/when running eval.py
         else:
-            print('***********PROCESS TEST IN EVAL**********************')
             self.test_dataset = dataset_cls(
                 self._data_path,
                 sample_per_epoch=-1,
