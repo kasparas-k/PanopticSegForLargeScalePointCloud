@@ -93,6 +93,45 @@ def cluster_single(embed_logits_logits_u, unique_in_batch, label_batch, local_in
             #normalize(sample_embed_logits, axis=0)
     
     partial_meanshift_cluster = partial(meanshift_cluster, bandwidth=bandwidth)
+    with multiprocessing.Pool(processes=None) as pool:
+        results = pool.map(partial_meanshift_cluster, all_clusters)
+        for i in range(len(results)):
+            pre_ins_labels_embed = results[i]
+            sampleInBatch_local_ind = local_logits[i]
+            unique_preInslabels = torch.unique(pre_ins_labels_embed)
+            for l in unique_preInslabels:
+                if l == -1:
+                    continue
+                label_mask_l = pre_ins_labels_embed == l
+                final_result.append(sampleInBatch_local_ind[label_mask_l])
+                cluster_type.append(type)        
+                
+    return final_result, cluster_type
+
+def __cluster_single(embed_logits_logits_u, unique_in_batch, label_batch, local_ind, type, bandwidth):
+    #t = time.time()
+    all_clusters = []
+    cluster_type = []
+    final_result = []
+    local_logits = []
+    
+    embed_logits_logits_u = embed_logits_logits_u.cpu().detach()
+    unique_in_batch = unique_in_batch.cpu().detach()
+    label_batch = label_batch.cpu().detach()
+    local_ind = local_ind.cpu().detach()
+
+    for s in unique_in_batch:
+        batch_mask = label_batch == s
+        if torch.sum(batch_mask)>3:
+            sampleInBatch_local_ind = local_ind[batch_mask]
+            local_logits.append(sampleInBatch_local_ind)
+            sample_embed_logits = embed_logits_logits_u[batch_mask]
+            #meanshift
+            #sample_embed_logits = torch.nn.functional.normalize(sample_embed_logits, dim=0)
+            all_clusters.append(sample_embed_logits.cpu().detach().numpy())
+            #normalize(sample_embed_logits, axis=0)
+    
+    partial_meanshift_cluster = partial(meanshift_cluster, bandwidth=bandwidth)
     results = []
     for i, cl in enumerate(all_clusters):
         start = time.process_time()
@@ -107,17 +146,6 @@ def cluster_single(embed_logits_logits_u, unique_in_batch, label_batch, local_in
             label_mask_l = pre_ins_labels_embed == l
             final_result.append(sampleInBatch_local_ind[label_mask_l])
             cluster_type.append(type)        
-        
-        #pre_ins_labels_embed = hdbscan_cluster(sample_embed_logits)
-        #unique_preInslabels = torch.unique(pre_ins_labels_embed)
-        #for l in unique_preInslabels:
-        #    if l == -1:
-        #        continue
-        #    label_mask_l = pre_ins_labels_embed == l
-        #    all_clusters.append(sampleInBatch_local_ind[label_mask_l])
-        #    cluster_type.append(type)
-                
-    #print("total time",time.time()-t)
     return final_result, cluster_type
 
 if __name__ == "__main__":
