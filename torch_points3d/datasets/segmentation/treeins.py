@@ -63,12 +63,21 @@ def read_treeins_format(train_file, label_out=True, verbose=False, debug=False, 
         y = _las.y.scaled_array()
         z = _las.z.scaled_array()
         # all coordinates shifted to have minimum at 0
+        if not np.all(_las.classification == 0):
+            semantic_seg = np.array(_las.classification)
+        else:
+            semantic_seg = np.array(_las.classification) + 2
+            target_classes = None
+        if hasattr(_las, 'treeID'):
+            treeID = np.array(_las.treeID)
+        else:
+            treeID = np.ones_like(semantic_seg)
         data = dict(
             x=x - np.min(x),
             y=y - np.min(y),
             z=z - np.min(z),
-            semantic_seg=np.array(_las.classification), # 2 should be the tree class at load time
-            treeID=np.array(_las.treeID),
+            semantic_seg=semantic_seg, # 2 should be the tree class at load time
+            treeID=treeID,
         )
 
     if target_classes is not None:
