@@ -3,17 +3,21 @@ defaults:
   - panoptic/default
 
 task: panoptic
-class: npm3d.NPM3DFusedDataset
-dataroot: /workspace/data
-dataset_name: npm3d
-fold: 4
-first_subsampling: 0.14
-radius: 16
+class: treeins.TreeinsFusedDataset
+dataroot: /workspace/
+train_val_separate: True # train val and test directories expected in the dataset's raw root
+dataset_name: pc
+forest_regions: []
+fold: []
+# target_classes: [5]
+first_subsampling: 0.2
+radius: 8
 grid_size: ${data.first_subsampling}
 keep_instance: True
 use_category: False
 sampling_format: 'cylinder'
 mode: last
+on_disk: True
 pre_collate_transform:
   #- transform: PointCloudFusion   # One point cloud per area
   - transform: SaveOriginalPosId    # Required so that one can recover the original point in the fused point cloud

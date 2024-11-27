@@ -295,6 +295,10 @@ class TreeinsOriginalFused(InMemoryDataset):
     def pre_processed_path(self):
         pre_processed_file_names = "preprocessed.pt"
         return os.path.join(self.processed_dir, pre_processed_file_names)
+    
+    @property
+    def pre_processed_dir(self):
+        return os.path.join(self.processed_dir, 'pre_processed')
 
     @property
     def raw_areas_paths(self):
@@ -314,7 +318,7 @@ class TreeinsOriginalFused(InMemoryDataset):
         # @Treeins: case for training/when running train.py
         if len(self.test_area)==0 or isinstance(self.test_area[0], int):
             return (
-            ["{}.pt".format(s) for s in ["train", "val", "test", "trainval"]]
+            ["{}.pt".format(s) for s in ["train", "val", "test"]]
             + self.raw_areas_paths
             + [self.pre_processed_path]
         )
@@ -348,7 +352,6 @@ class TreeinsOriginalFused(InMemoryDataset):
             input_ply_files = self.raw_file_names
 
             # Gather data per area
-            data_list = [[] for _ in range(len(input_ply_files))] #@Treeins: list of lists which each contains one .ply data file
             for area_num, file_path in enumerate(input_ply_files):
                 area_name = os.path.split(file_path)[-1]
                 xyz, semantic_labels, instance_labels = read_treeins_format(
@@ -357,22 +360,18 @@ class TreeinsOriginalFused(InMemoryDataset):
                 )
 
                 data = Data(pos=xyz, y=semantic_labels)
-                data.validation_set = False
-                data.test_set = False
                 if not self._train_val_separate:
                     #@Treeins: list of lists which each contains one .ply data file
+                    split = 'train'
                     if area_name[-7:-4]=="val":
-                        data.validation_set = True
+                        split = 'val'
                     #@Treeins:  if "test" at end of area_name, i.e. at end of .ply file name, we put data file into test set
                     elif area_name[-8:-4]=="test":
-                        data.test_set = True
+                        split = 'test'
                         self.test_area.append(area_num)
                 else:
                     split = Path(file_path).resolve().relative_to(Path(self.raw_dir).resolve()).parts[0]
-                    if split == 'val':
-                        data.validation_set = True
-                    elif split == 'test':
-                        data.test_set = True
+                    if split == 'test':
                         self.test_area.append(area_num)
 
                 if self.keep_instance:
@@ -381,64 +380,30 @@ class TreeinsOriginalFused(InMemoryDataset):
                 if self.pre_filter is not None and not self.pre_filter(data):
                     continue
                 print("area_num:")
-                print(area_num)
+                print(area_num, Path(file_path).name)
                 print("data:")  #Data(pos=[30033430, 3], validation_set=False, y=[30033430])
                 print(data)
-                data_list[area_num].append(data)
-            raw_areas = cT.PointCloudFusion()(data_list)
-            for i, area in enumerate(raw_areas):
-                torch.save(area, self.raw_areas_paths[i])
 
-
-            for area_datas in data_list:
-                # Apply pre_transform
+                torch.save(cT.PointCloudFusion()([data]), self.raw_areas_paths[area_num])
                 if self.pre_transform is not None:
-                    area_datas = self.pre_transform(area_datas)
-            torch.save(data_list, self.pre_processed_path)
-        # if we already processed the raw .ply data files in a previous run with the same grid_size and forest_regions, we can simply load the processed data
-        else:
-            data_list = torch.load(self.pre_processed_path)
+                    data = self.pre_transform([data]) 
+                out_path = Path(self.pre_processed_dir) / f'{split}/preprocessed_{area_num}.pt'
+                out_path.parent.mkdir(exist_ok=True, parents=True)
+                torch.save([data], out_path)
+                del data
 
         if self.debug:
             return
 
-        train_data_list = []
-        val_data_list = []
-        trainval_data_list = []
-        test_data_list = []
+        data_list = []  
         #list is a list containing one single data file path
-        for list in data_list:
-            # data is one single file path
-            for data in list:
-                validation_set = data.validation_set
-                del data.validation_set
-                test_set = data.test_set
-                del data.test_set
-                if validation_set:
-                    val_data_list.append(data)
-                elif test_set:
-                    test_data_list.append(data)
-                else:
-                    train_data_list.append(data)
-        trainval_data_list = val_data_list + train_data_list
+        for data_path in (Path(self.pre_processed_dir) / self._split).rglob('*.pt'):
+            data = torch.load(data_path)
+            if self.pre_collate_transform:
+                data = self.pre_collate_transform(data)[0]
+            data_list.append(data)
+        torch.save(data_list, Path(self.processed_dir) / f'{self._split}.pt')
 
-        print("train_data_list:")
-        print(train_data_list)
-        print("test_data_list:")
-        print(test_data_list)
-        print("val_data_list:")
-        print(val_data_list)
-        print("trainval_data_list:")
-        print(trainval_data_list)
-        if self.pre_collate_transform:
-            log.info("pre_collate_transform ...")
-            log.info(self.pre_collate_transform)
-            train_data_list = self.pre_collate_transform(train_data_list)
-            val_data_list = self.pre_collate_transform(val_data_list)
-            test_data_list = self.pre_collate_transform(test_data_list)
-            trainval_data_list = self.pre_collate_transform(trainval_data_list)
-
-        self._save_data(train_data_list, val_data_list, test_data_list, trainval_data_list)
 
     def process_test(self, test_area):
         """Takes the .ply files specified in data:fold: [...] in the file conf/eval.yaml as test files, processes them and saves the newly created files in self.processed_dir.

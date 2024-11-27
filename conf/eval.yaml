@@ -9,7 +9,7 @@ enable_cudnn: True
 #TO ADAPT
 #checkpoint_dir specifies path to the directory where the trained model (that should be used for evaluation) and the used configurations are saved,
 #e.g. /path/to/project/PanopticSegForLargeScalePointCloud/outputs/treeins_my_first_run/treeins_my_first_run-PointGroup-PAPER-20230705_215106"
-checkpoint_dir: "/workspace/data/checkpoints/treeins_li/treeins_li-PointGroup-PAPER-20240517_202452"
+checkpoint_dir: "/workspace/data/checkpoints/paper"
 model_name: PointGroup-PAPER
 precompute_multi_scale: True # Compute multiscate features on cpu for faster training / inference
 enable_dropout: False
@@ -17,7 +17,7 @@ voting_runs: 1
 # data: 
 #   #TO ADAPT
 #   #fold: list of .ply test file paths, e.g. ['/path/to/project/PanopticSegForLargeScalePointCloud/data/treeinsfused/raw/SCION/SCION_plot_31_annotated_test.ply', '/path/to/project/PanopticSegForLargeScalePointCloud/data/treeinsfused/raw/SCION/SCION_plot_61_annotated_test.ply']
-#   fold: []
+  # fold: []
 
 tracker_options: # Extra options for the tracker
   full_res: True

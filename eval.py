@@ -13,16 +13,15 @@ def main(cfg):
     if cfg.pretty_print:
         print(OmegaConf.to_yaml(cfg))
     
-    test_root = (Path(cfg.data.dataroot) / cfg.data.dataset_name / 'raw/test').resolve()
+    # test_root = (Path(cfg.data.dataroot) / cfg.data.dataset_name / 'raw').resolve()
+    test_root = Path('/workspace/pc')
     pcs = []
     for fmt in ['las', 'laz', 'ply']:
-        pcs.extend(list(test_root.glob(f'**/*.{fmt}')))
-
-    # test_root = (Path(cfg.data.dataroot) / cfg.data.dataset_name / 'raw').resolve()
+        pcs.extend(list(test_root.rglob(f'*.{fmt}')))
     # pcs = []
     # for fmt in ['las', 'laz', 'ply']:
     #     pcs.extend(list(test_root.glob(f'**/*val.{fmt}')))
-    cfg.data.fold = sorted(str(p) for p in pcs)[-1:]
+    cfg.data.fold = sorted(str(p) for p in pcs)
     trainer = Trainer(cfg, True)
     trainer.eval(stage_name = "test")
     #

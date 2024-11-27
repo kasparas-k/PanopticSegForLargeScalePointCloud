@@ -558,6 +558,8 @@ class PanopticTreeinsCylinder(PanopticTreeinsBase, TreeinsCylinder):
         super().process()
 
     def download(self):
+        print('*'*30)
+        print(self.raw_dir)
         super().download()
 
 

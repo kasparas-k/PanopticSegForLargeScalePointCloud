@@ -1,4 +1,3 @@
-# Ref: https://github.com/chrischoy/SpatioTemporalSegmentation/blob/master/config.py
 # @package training
 epochs: 150 #TO ADAPT: specify number of training epochs
 num_workers: 0

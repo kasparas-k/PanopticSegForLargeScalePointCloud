@@ -445,6 +445,8 @@ class PanopticNPM3DCylinder(PanopticNPM3DBase, NPM3DCylinder):
         super().process()
 
     def download(self):
+        print('*'*30)
+        print(self.raw_dir)
         super().download()
 
 

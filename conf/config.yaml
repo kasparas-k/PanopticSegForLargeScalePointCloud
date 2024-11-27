@@ -3,7 +3,7 @@ defaults: # for loading the default.yaml config
 
   - visualization: default
   - lr_scheduler: exponential
-  - training: ablation_area4_set2  #pointgroup_NPM3D-embed-cluster1_scratch1 
+  - training: treeins  #pointgroup_NPM3D-embed-cluster1_scratch1 
 #
   - debugging: default
   - models: panoptic/area4_ablation_2  #panoptic/pointgroup-embed_clustertype1_scratch1 
