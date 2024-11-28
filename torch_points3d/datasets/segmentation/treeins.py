@@ -348,49 +348,49 @@ class TreeinsOriginalFused(InMemoryDataset):
         """Takes the given .ply files, processes them and saves the newly created files in self.processed_dir.
         This method is used during training/running train.py."""
 
-        if not os.path.exists(self.pre_processed_path):# @Treeins: if we haven't already processed the raw .ply data files in a previous run with the same grid_size and forest_regions
-            input_ply_files = self.raw_file_names
+        input_ply_files = self.raw_file_names
 
-            # Gather data per area
-            for area_num, file_path in enumerate(input_ply_files):
-                area_name = os.path.split(file_path)[-1]
-                xyz, semantic_labels, instance_labels = read_treeins_format(
-                    file_path, label_out=True, verbose=self.verbose, debug=self.debug,
-                    target_classes=self.target_classes, scale_coords=self._scale_coords
-                )
+        # Gather data per area
+        for area_num, file_path in enumerate(input_ply_files):
+            if not self._train_val_separate:
+                split = 'train'
+                if area_name[-7:-4]=="val":
+                    split = 'val'
+                elif area_name[-8:-4]=="test":
+                    split = 'test'
+            else:
+                split = Path(file_path).resolve().relative_to(Path(self.raw_dir).resolve()).parts[0]
 
-                data = Data(pos=xyz, y=semantic_labels)
-                if not self._train_val_separate:
-                    #@Treeins: list of lists which each contains one .ply data file
-                    split = 'train'
-                    if area_name[-7:-4]=="val":
-                        split = 'val'
-                    #@Treeins:  if "test" at end of area_name, i.e. at end of .ply file name, we put data file into test set
-                    elif area_name[-8:-4]=="test":
-                        split = 'test'
-                        self.test_area.append(area_num)
-                else:
-                    split = Path(file_path).resolve().relative_to(Path(self.raw_dir).resolve()).parts[0]
-                    if split == 'test':
-                        self.test_area.append(area_num)
+            out_path = Path(self.pre_processed_dir) / f'{split}/preprocessed_{area_num}.pt'
+            if out_path.is_file():
+                continue
+            out_path.parent.mkdir(exist_ok=True, parents=True)
+            area_name = os.path.split(file_path)[-1]
+            xyz, semantic_labels, instance_labels = read_treeins_format(
+                file_path, label_out=True, verbose=self.verbose, debug=self.debug,
+                target_classes=self.target_classes, scale_coords=self._scale_coords
+            )
 
-                if self.keep_instance:
-                    data.instance_labels = instance_labels
+            data = Data(pos=xyz, y=semantic_labels)
+            if split == 'test':
+                self.test_area.append(area_num)
 
-                if self.pre_filter is not None and not self.pre_filter(data):
-                    continue
-                print("area_num:")
-                print(area_num, Path(file_path).name)
-                print("data:")  #Data(pos=[30033430, 3], validation_set=False, y=[30033430])
-                print(data)
+            if self.keep_instance:
+                data.instance_labels = instance_labels
 
+            if self.pre_filter is not None and not self.pre_filter(data):
+                continue
+            print("area_num:")
+            print(area_num, Path(file_path).name)
+            print("data:")  #Data(pos=[30033430, 3], validation_set=False, y=[30033430])
+            print(data)
+
+            if not Path(self.raw_areas_paths[area_num]).is_file():
                 torch.save(cT.PointCloudFusion()([data]), self.raw_areas_paths[area_num])
-                if self.pre_transform is not None:
-                    data = self.pre_transform([data]) 
-                out_path = Path(self.pre_processed_dir) / f'{split}/preprocessed_{area_num}.pt'
-                out_path.parent.mkdir(exist_ok=True, parents=True)
-                torch.save([data], out_path)
-                del data
+            if self.pre_transform is not None:
+                data = self.pre_transform([data]) 
+            torch.save([data], out_path)
+            del data
 
         if self.debug:
             return
@@ -398,10 +398,20 @@ class TreeinsOriginalFused(InMemoryDataset):
         data_list = []  
         #list is a list containing one single data file path
         for data_path in (Path(self.pre_processed_dir) / self._split).rglob('*.pt'):
+            out_path = Path(self.processed_dir) / f'pre_collate/{split}/{data_path.name}'
+            if out_path.is_file():
+                continue
+            out_path.parent.mkdir(exist_ok=True, parents=True)
             data = torch.load(data_path)
+            print(out_path.name, data)
             if self.pre_collate_transform:
                 data = self.pre_collate_transform(data)[0]
-            data_list.append(data)
+                print(data)
+            torch.save(data, out_path)
+            del data
+            data_list.append(data_path)
+        
+        data_list = [torch.load(d) for d in data_list]
         torch.save(data_list, Path(self.processed_dir) / f'{self._split}.pt')
 
 
