@@ -395,9 +395,9 @@ class TreeinsOriginalFused(InMemoryDataset):
         if self.debug:
             return
 
-        data_list = []  
+        data_list = (Path(self.pre_processed_dir) / self._split).rglob('*.pt')
         #list is a list containing one single data file path
-        for data_path in (Path(self.pre_processed_dir) / self._split).rglob('*.pt'):
+        for data_path in data_list:
             out_path = Path(self.processed_dir) / f'pre_collate/{split}/{data_path.name}'
             if out_path.is_file():
                 continue
@@ -409,7 +409,6 @@ class TreeinsOriginalFused(InMemoryDataset):
                 print(data)
             torch.save(data, out_path)
             del data
-            data_list.append(data_path)
         
         data_list = [torch.load(d) for d in data_list]
         torch.save(data_list, Path(self.processed_dir) / f'{self._split}.pt')
