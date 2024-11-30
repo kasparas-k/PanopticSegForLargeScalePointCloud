@@ -9,7 +9,7 @@ from multiprocessing import Process
 from functools import partial
 def meanshift_cluster(prediction, bandwidth):
     bandwidth = bandwidth #0.6
-    ms = MeanShift(bandwidth=bandwidth,bin_seeding=True, n_jobs=1)
+    ms = MeanShift(bandwidth=bandwidth,bin_seeding=True, n_jobs=-1)
     # ms = MeanShiftEuc(bandwidth=bandwidth) #, n_jobs=-1)
     #print ('Mean shift clustering, might take some time ...')
     ms.fit(prediction)
@@ -93,18 +93,16 @@ def cluster_single(embed_logits_logits_u, unique_in_batch, label_batch, local_in
             #normalize(sample_embed_logits, axis=0)
     
     partial_meanshift_cluster = partial(meanshift_cluster, bandwidth=bandwidth)
-    with multiprocessing.Pool(processes=None) as pool:
-        results = pool.map(partial_meanshift_cluster, all_clusters)
-        for i in range(len(results)):
-            pre_ins_labels_embed = results[i]
-            sampleInBatch_local_ind = local_logits[i]
-            unique_preInslabels = torch.unique(pre_ins_labels_embed)
-            for l in unique_preInslabels:
-                if l == -1:
-                    continue
-                label_mask_l = pre_ins_labels_embed == l
-                final_result.append(sampleInBatch_local_ind[label_mask_l])
-                cluster_type.append(type)        
+    for i in range(len(all_clusters)):
+        pre_ins_labels_embed = partial_meanshift_cluster(all_clusters[i])
+        sampleInBatch_local_ind = local_logits[i]
+        unique_preInslabels = torch.unique(pre_ins_labels_embed)
+        for l in unique_preInslabels:
+            if l == -1:
+                continue
+            label_mask_l = pre_ins_labels_embed == l
+            final_result.append(sampleInBatch_local_ind[label_mask_l])
+            cluster_type.append(type)        
                 
     return final_result, cluster_type
 
@@ -129,7 +127,7 @@ def __cluster_single(embed_logits_logits_u, unique_in_batch, label_batch, local_
             #meanshift
             #sample_embed_logits = torch.nn.functional.normalize(sample_embed_logits, dim=0)
             all_clusters.append(sample_embed_logits.cpu().detach().numpy())
-            #normalize(sample_embed_logits, axis=0)
+            #normalize(sample_embed_logits, axis=-1)
     
     partial_meanshift_cluster = partial(meanshift_cluster, bandwidth=bandwidth)
     results = []
